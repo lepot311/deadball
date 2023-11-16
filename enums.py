@@ -45,3 +45,9 @@ Traits = Enum('Traits', [
     'ST+',
     'T+',
 ])
+
+pos_pitchers = (
+    Positions.SP,
+    Positions.RP,
+    Positions.CP,
+)

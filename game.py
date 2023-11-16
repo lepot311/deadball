@@ -6,7 +6,7 @@ import sys
 
 from tabulate import tabulate
 
-from enums import Handedness, PitcherDice, Positions, Traits
+from enums import Handedness, PitcherDice, Positions, Traits, pos_pitchers
 
 
 logging.basicConfig(filename='debug.log', level=logging.DEBUG)
@@ -59,7 +59,7 @@ class Team:
 
         self._retired = set()
         self.lineup   = []
-        self.bullpen  = { p for p in self.players if p.pd }
+        self.bullpen  = { p for p in self.players if p.pos in pos_pitchers }
         self.pitcher  = None
 
         logging.debug("Inited team %s with %s ball players.", self.name, len(self.players))
@@ -76,6 +76,10 @@ class Team:
     def bench(self):
         return self.players - set(self.lineup) - self.retired
 
+    @property
+    def starting_pitchers(self):
+        return [ p for p in self.bullpen if p.pos.name == 'SP' ]
+
     def add_player(self, player: Player):
         self.players.add(player)
         if player.pd:
@@ -86,12 +90,15 @@ class Team:
 
         assert len(numbers) == 9, "Nine players are required to set a lineup."
 
+        logging.debug("Setting lineup: %s", ', '.join([ str(n) for n in numbers ]))
+
         self.lineup = [
             self.get_player_by_number(n)
             for n in numbers
         ]
 
-        logging.debug("Set lineup: %s", ', '.join([ str(n) for n in self.lineup ]))
+    def set_pitcher(self, player: Player):
+        self.pitcher = player
 
     def retire(self, player: Player) -> int:
         i = self.lineup.index(player)
@@ -122,6 +129,7 @@ class Team:
             'pos',
             'bt',
             'obt',
+            'pd',
             'traits',
         ]
         rows = []
@@ -139,7 +147,37 @@ class Team:
 
         print(tabulate(
             rows,
-            headers= ['BATTING_ORDER'] + [ f.upper() for f in fields ],
+            headers= ['ORDER'] + [ f.upper() for f in fields ],
+            tablefmt='fancy_grid',
+        ))
+
+    def print_bullpen(self):
+        fields = [
+            'number',
+            'name',
+            'hand',
+            'pos',
+            'bt',
+            'obt',
+            'pd',
+            'traits',
+        ]
+        rows = []
+        for player in self.bullpen:
+            row = []
+            for f in fields:
+                value = getattr(player, f)
+                if isinstance(value, Enum):
+                    row.append(value.name)
+                elif type(value) is list:
+                    row.append(' '.join([ v.name for v in value ]))
+                else:
+                    row.append(value)
+            rows.append(row)
+
+        print(tabulate(
+            rows,
+            headers= [ f.upper() for f in fields ],
             tablefmt='fancy_grid',
         ))
 
@@ -155,15 +193,17 @@ class Game:
             'name'  : row['Name'],
             'number': n,
             'obt'   : int(row['OBT']),
-            'pd'    : PitcherDice[row['PD']] if row['PD'] else None,
+            'pd'    : PitcherDice[row['PD']] if row['PD'] else PitcherDice['-d4'],
             'pos'   : Positions[row['Position']],
             'traits': [ Traits[t] for t in row['Traits'].split() ],
         }
 
     def get_team_from_roster(self, filename) -> Team:
+        logging.debug("Loading roster file: %s", filename)
+
         with open(filename) as fh:
             reader = csv.DictReader(fh)
-            roster = [ self.clean_row(n, row) for n, row in enumerate(reader) ]
+            roster = [ self.clean_row(n+1, row) for n, row in enumerate(reader) ]
 
         players = [ Player(**row) for row in roster ]
         team_name = filename.split('roster__')[-1].split('.')[0].replace('_', ' ').title()
@@ -174,6 +214,8 @@ class Game:
 if __name__ == '__main__':
     roster_filename_a = sys.argv[1]
     roster_filename_b = sys.argv[2]
+
+    use_defaults = True
 
     game = Game()
     game.teams.append(game.get_team_from_roster(roster_filename_a))
@@ -187,9 +229,23 @@ if __name__ == '__main__':
         print()
         print(team.name)
         print()
+        print("Lineup:")
         team.print_lineup()
         print()
-        change_lineup = input("Change lineup? [y/N] ")
-        if change_lineup.lower() in ('y', 'yes'):
-            # TODO
-            pass
+        if not use_defaults:
+            change_lineup = input("Change lineup? [y/N] ")
+            if change_lineup.lower() in ('y', 'yes'):
+                # TODO
+                pass
+        print("Bullpen:")
+        team.print_bullpen()
+        starting_pitcher = team.starting_pitchers[0]
+        team.set_pitcher(starting_pitcher)
+        print()
+        print(f"Starting pitcher: {team.pitcher.name}")
+        print()
+        if not use_defaults:
+            change_pitcher = input("Change starting pitcher? [y/N] ")
+            if change_pitcher.lower() in ('y', 'yes'):
+                # TODO
+                pass
