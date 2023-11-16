@@ -34,3 +34,7 @@ def test_roll():
         assert 1 < roll('2d4') < 9
         assert 3 < roll('4d4') < 17
         assert 1 < roll('2d10') < 21
+
+def test_bullpen(team):
+    assert len(team.bullpen) == 10
+    assert all([ p.pd for p in team.bullpen ])

@@ -55,12 +55,18 @@ class Player:
 class Team:
     def __init__(self, name, players=None):
         self.name     = name
-        self.players  = set(players) if players else set()
+        self._players = set(players) if players else set()
 
         self._retired = set()
         self.lineup   = []
+        self.bullpen  = { p for p in self.players if p.pd }
+        self.pitcher  = None
 
         logging.debug("Inited team %s with %s ball players.", self.name, len(self.players))
+
+    @property
+    def players(self):
+        return self._players
 
     @property
     def retired(self):
@@ -69,6 +75,11 @@ class Team:
     @property
     def bench(self):
         return self.players - set(self.lineup) - self.retired
+
+    def add_player(self, player: Player):
+        self.players.add(player)
+        if player.pd:
+            self.bullpen.add(player)
 
     def set_lineup(self, numbers=None):
         numbers = numbers or list(range(1, 10))
