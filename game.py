@@ -173,4 +173,12 @@ if __name__ == '__main__':
 
     for team in game.teams:
         team.set_lineup()
+        print()
+        print(team.name)
+        print()
         team.print_lineup()
+        print()
+        change_lineup = input("Change lineup? [y/N] ")
+        if change_lineup.lower() in ('y', 'yes'):
+            # TODO
+            pass
