@@ -1,7 +1,10 @@
 import csv
+from enum import Enum
 import logging
 import random
 import sys
+
+from tabulate import tabulate
 
 from enums import Handedness, PitcherDice, Positions, Traits
 
@@ -101,10 +104,33 @@ class Team:
         self.lineup.insert(i, entering)
 
     def print_lineup(self):
-        result = []
-        for player in self.lineup:
-            result.append(f"#{player.number:>2} {player.pos.name:>2} {player.hand.name} {player.name}")
-        print('\n'.join(result))
+        fields = [
+            'number',
+            'name',
+            'hand',
+            'pos',
+            'bt',
+            'obt',
+            'traits',
+        ]
+        rows = []
+        for i, player in enumerate(self.lineup):
+            row = [i+1]
+            for f in fields:
+                value = getattr(player, f)
+                if isinstance(value, Enum):
+                    row.append(value.name)
+                elif type(value) is list:
+                    row.append(' '.join([ v.name for v in value ]))
+                else:
+                    row.append(value)
+            rows.append(row)
+
+        print(tabulate(
+            rows,
+            headers= ['BATTING_ORDER'] + [ f.upper() for f in fields ],
+            tablefmt='fancy_grid',
+        ))
 
 
 class Game:
