@@ -12,9 +12,7 @@ from enums import Handedness, PitcherDice, Positions, Traits, pos_pitchers
 logging.basicConfig(filename='debug.log', level=logging.DEBUG)
 
 # CONFIGURATION
-N_INNINGS    = 9
-N_BALLS_AB   = 4
-N_STRIKES_AB = 3
+N_INNINGS = 9
 
 
 def roll(kind: str) -> int:
@@ -182,9 +180,30 @@ class Team:
         ))
 
 
+class Inning:
+    def __init__(self, number: int, top: bool):
+        self.number = number
+        self.top    = top
+
+        self.batting  = None
+        self.fielding = None
+        self.outs     = 0
+        self.runs     = 0
+
+    @property
+    def name(self):
+        half_name = "top" if self.top else "bottom"
+        return f"{half_name} of the {self.number}"
+
+
 class Game:
     def __init__(self, teams=None):
-        self.teams = teams or []
+        self.teams   = teams or []
+        self.innings = []
+
+    @property
+    def inning(self):
+        return self.innings[-1]
 
     def clean_row(self, n, row):
         return {
@@ -209,6 +228,62 @@ class Game:
         team_name = filename.split('roster__')[-1].split('.')[0].replace('_', ' ').title()
         logging.debug("Loaded team '%s' from roster file: %s", team_name, filename)
         return Team(team_name, players=players)
+
+    def play_at_bat(self):
+        batter = game.inning.batting.lineup[0]
+        # throw the pitch
+        pitcher = game.inning.fielding.pitcher
+        pd = pitcher.pd.name
+        pitch_value = roll(pd)
+        logging.info("Pitcher %s threw %s.", pitcher.name, pitch_value)
+        # TODO
+        self.inning.outs += 1
+        import time
+        time.sleep(1)
+
+    def play_inning(self):
+        print()
+        print(f"Inning: {self.inning.name}")
+        print("Now batting:", self.inning.batting.name)
+        print()
+        while self.inning.outs < 3:
+            self.play_at_bat()
+            print('outs', self.inning.outs)
+
+    def play(self):
+        inning_number = 1
+
+        inning = Inning(inning_number, True)
+        inning.batting  = self.teams[0]
+        inning.fielding = self.teams[1]
+
+        self.innings.append(inning)
+
+        while self.inning.number < 4:
+            # TODO go in to extra innings
+            self.play_inning()
+
+            # TODO create an InningHalf class
+            #      maybe just use halfs instead of innings?
+
+            # flip the inning half
+            top = not self.inning.top
+
+            # TODO remove this assert
+            assert self.inning.top is not top
+
+            # advance inning if we finished the bottom of an inning
+            if top:
+                inning_number += 1
+
+            # TODO this sucks
+            new_batting, new_fielding = inning.fielding, inning.batting
+
+            inning = Inning(inning_number, top)
+            inning.batting  = new_batting
+            inning.fielding = new_fielding
+
+            self.innings.append(inning)
 
 
 if __name__ == '__main__':
@@ -249,3 +324,6 @@ if __name__ == '__main__':
             if change_pitcher.lower() in ('y', 'yes'):
                 # TODO
                 pass
+
+    # play ball!
+    game.play()
