@@ -95,6 +95,7 @@ class Team:
 
     @property
     def up_to_bat(self):
+        # TODO: you _could_ use a collections.deque here and rotate it
         return self.lineup[self._batter_n % 9]
 
     @property
@@ -236,8 +237,8 @@ class AtBat:
         logging.debug("MSS=%s", mss)
 
         # TODO
-        #import time
-        #time.sleep(0.2)
+        import time
+        time.sleep(1)
 
         # TODO modify swing value
 
@@ -284,6 +285,8 @@ class InningHalf:
 
         logging.debug(f"Starting half: {self}")
         while self.outs < 3:
+            # select next batter
+            self.batting._batter_n += 1
             self.at_bats.append(AtBat(self))
             self.at_bat.play()
             logging.debug("Outs: %s", self.outs)
@@ -343,11 +346,11 @@ class Game:
 
     def clean_row(self, n, row):
         return {
-            'bt'    : int(row['BT']),
-            'hand'  : Handedness[row['Handedness']],
-            'name'  : row['Name'],
             'number': n,
-            'obt'   : int(row['OBT']),
+            'name'  : row['Name'],
+            'hand'  : Handedness[row['Handedness']],
+            'bt'    : int(row['BT']) if row['BT'] else None,
+            'obt'   : int(row['OBT']) if row['OBT'] else None,
             'pd'    : PitcherDice[row['PD']] if row['PD'] else PitcherDice['-d4'],
             'pos'   : Positions[row['Position']],
             'traits': [ Traits[t] for t in row['Traits'].split() ],
