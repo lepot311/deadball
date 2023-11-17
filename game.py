@@ -1,12 +1,13 @@
 import csv
 from enum import Enum
+from itertools import zip_longest
 import logging
 import random
 import sys
 
 from tabulate import tabulate
 
-from enums import Handedness, PitcherDice, Positions, Traits, pos_pitchers
+from enums import Handedness, PitcherDice, Positions, Traits, InningHalfName, pos_pitchers
 
 
 logging.basicConfig(filename='debug.log', level=logging.DEBUG)
@@ -16,6 +17,8 @@ N_INNINGS = 9
 
 
 def roll(kind: str) -> int:
+    # drop negative sign
+    kind = kind.strip('-')
     count, n_sides = kind.split('d')
     count   = int(count) if count else 1
     n_sides = int(n_sides)
@@ -41,8 +44,8 @@ class Player:
         return '\n'.join([
             line.strip() for line in
             f'''
-            Name: {self.name}
-            ------{'-'*len(self.name)}
+            {self.name}
+            {'-'*len(self.name)}
             Position: {self.pos.name} Handed: {self.hand.name}
             BT: {self.bt} OBT: {self.obt} {'PD:' if self.pd else ''} {self.pd.name if self.pd else ''}
             {'Traits:' if self.traits else ''} {' '.join([t.name for t in self.traits]) if self.traits else ''}
@@ -51,20 +54,48 @@ class Player:
 
 
 class Team:
-    def __init__(self, name, players=None):
+    def __init__(self, game, name, players=None):
+        self.game     = game
         self.name     = name
         self._players = set(players) if players else set()
 
-        self._retired = set()
-        self.lineup   = []
-        self.bullpen  = { p for p in self.players if p.pos in pos_pitchers }
-        self.pitcher  = None
+        self._retired  = set()
+        self._batter_n = 0
+        self.lineup    = []
+        self.bullpen   = { p for p in self.players if p.pos in pos_pitchers }
+        self.pitcher   = None
 
         logging.debug("Inited team %s with %s ball players.", self.name, len(self.players))
 
     @property
+    def halfs_at_bat(self):
+        result = []
+        for inning in self.game.innings:
+            for half in inning.halfs:
+                if half.batting == self:
+                    result.append(half)
+        return result
+
+
+    @property
+    def runs(self):
+        return sum([ half.runs for half in self.halfs_at_bat ])
+
+    @property
+    def hits(self):
+        return sum([ half.hits for half in self.halfs_at_bat ])
+
+    @property
+    def errors(self):
+        return sum([ half.errors for half in self.halfs_at_bat ])
+
+    @property
     def players(self):
         return self._players
+
+    @property
+    def up_to_bat(self):
+        return self.lineup[self._batter_n % 9]
 
     @property
     def retired(self):
@@ -180,20 +211,110 @@ class Team:
         ))
 
 
-class Inning:
-    def __init__(self, number: int, top: bool):
-        self.number = number
-        self.top    = top
+class AtBat:
+    def __init__(self, half):
+        self.half = half
 
-        self.batting  = None
-        self.fielding = None
-        self.outs     = 0
-        self.runs     = 0
+    def play(self):
+        batter  = self.half.batting.up_to_bat
+        pitcher = self.half.fielding.pitcher
+        print()
+        print("Now batting:")
+        print(batter)
+        # throw the pitch
+        # TODO add mods
+        pitch_value = roll(pitcher.pd.name)
+        logging.info("Pitcher %s threw %s.", pitcher.name, pitch_value)
+
+        # batter swings
+        swing_value = roll('d100')
+        logging.info("Batter %s swung %s.", batter.name, swing_value)
+
+        # TODO
+        #import time
+        #time.sleep(0.2)
+
+        # TODO modify swing value
+
+        # TODO implement swing result tables
+
+        # TODO check rules to see if roll should be <= bt or < bt
+        if swing_value <= batter.bt:
+            logging.debug("HIT!")
+            print()
+            print("HIT!")
+            print()
+            # TODO every hit is a solo home run for now
+            #self.half.runners.append(batter)
+            self.half.hits += 1
+            self.half.runs += 1
+        else:
+            # TODO check out table
+            self.half.outs += 1
+
+
+class InningHalf:
+    def __init__(self, inning, name: InningHalfName):
+        self.inning = inning
+        self.name   = name
+
+        self.outs    = 0
+        self.runs    = 0
+        self.hits    = 0
+        self.errors  = 0
+        self.runners = []  # TODO make this a queue length=4
+        self.at_bats = []
+
+        if self.name is InningHalfName.TOP:
+            self.batting, self.fielding = self.inning.game.teams
+        else:
+            self.fielding, self.batting = self.inning.game.teams
 
     @property
-    def name(self):
-        half_name = "top" if self.top else "bottom"
-        return f"{half_name} of the {self.number}"
+    def at_bat(self):
+        return self.at_bats[-1]
+
+    def play(self):
+        self.inning.game.print_scoreboard()
+
+        logging.debug(f"Starting half: {self}")
+        while self.outs < 3:
+            self.at_bats.append(AtBat(self))
+            self.at_bat.play()
+            logging.debug("Outs: %s", self.outs)
+        logging.debug(f"Ending half: {self}")
+
+    def __str__(self):
+        return f"{self.name.name} of the {self.inning.number}"
+
+
+class Inning:
+    def __init__(self, game, number: int):
+        self.game   = game
+        self.number = number
+
+        self.halfs = []
+
+    @property
+    def half(self):
+        return self.halfs[-1]
+
+    @property
+    def is_over(self):
+        return (len(self.halfs) == 2) and (self.halfs[1].outs == 3)
+
+    def play(self):
+        while len(self.halfs) < 2:
+            if not self.halfs:
+                half = InningHalf(self, InningHalfName.TOP)
+            elif len(self.halfs) == 1:
+                half = InningHalf(self, InningHalfName.BOTTOM)
+
+            self.halfs.append(half)
+            print()
+            print(self.half)
+            print()
+            self.half.play()
 
 
 class Game:
@@ -201,9 +322,19 @@ class Game:
         self.teams   = teams or []
         self.innings = []
 
+        self._n_inning = 0
+
     @property
     def inning(self):
         return self.innings[-1]
+
+    @property
+    def away(self):
+        return self.teams[0]
+
+    @property
+    def home(self):
+        return self.teams[1]
 
     def clean_row(self, n, row):
         return {
@@ -227,63 +358,59 @@ class Game:
         players = [ Player(**row) for row in roster ]
         team_name = filename.split('roster__')[-1].split('.')[0].replace('_', ' ').title()
         logging.debug("Loaded team '%s' from roster file: %s", team_name, filename)
-        return Team(team_name, players=players)
+        return Team(self, team_name, players=players)
 
-    def play_at_bat(self):
-        batter = game.inning.batting.lineup[0]
-        # throw the pitch
-        pitcher = game.inning.fielding.pitcher
-        pd = pitcher.pd.name
-        pitch_value = roll(pd)
-        logging.info("Pitcher %s threw %s.", pitcher.name, pitch_value)
-        # TODO
-        self.inning.outs += 1
-        import time
-        time.sleep(1)
-
-    def play_inning(self):
-        print()
-        print(f"Inning: {self.inning.name}")
-        print("Now batting:", self.inning.batting.name)
-        print()
-        while self.inning.outs < 3:
-            self.play_at_bat()
-            print('outs', self.inning.outs)
-
-    def play(self):
-        inning_number = 1
-
-        inning = Inning(inning_number, True)
-        inning.batting  = self.teams[0]
-        inning.fielding = self.teams[1]
-
+    def make_next_inning(self):
+        self._n_inning += 1
+        inning = Inning(self, self._n_inning)
         self.innings.append(inning)
 
-        while self.inning.number < 4:
-            # TODO go in to extra innings
-            self.play_inning()
+    def print_scoreboard(self):
+        n_innings = max(self._n_inning, N_INNINGS)
+        # TODO clean up: merge these
+        halfs_away = self.away.halfs_at_bat
 
-            # TODO create an InningHalf class
-            #      maybe just use halfs instead of innings?
+        runs_away = []
+        for n in range(n_innings):
+            try:
+                runs = halfs_away[n].runs
+            except IndexError:
+                runs = None
+            runs_away.append(runs)
 
-            # flip the inning half
-            top = not self.inning.top
 
-            # TODO remove this assert
-            assert self.inning.top is not top
+        halfs_home = []
+        for inning in self.innings:
+            for half in inning.halfs:
+                if half.batting == self.home:
+                    halfs_home.append(half)
 
-            # advance inning if we finished the bottom of an inning
-            if top:
-                inning_number += 1
+        runs_home = []
+        for n in range(n_innings):
+            try:
+                runs = halfs_home[n].runs
+            except IndexError:
+                runs = None
+            runs_home.append(runs)
 
-            # TODO this sucks
-            new_batting, new_fielding = inning.fielding, inning.batting
+        rows = [
+            ['Visitors', self.away.name] + runs_away + ['', self.away.runs, self.away.hits, self.away.errors],
+            ['Home',     self.home.name] + runs_home + ['', self.home.runs, self.home.hits, self.home.errors],
+        ]
 
-            inning = Inning(inning_number, top)
-            inning.batting  = new_batting
-            inning.fielding = new_fielding
+        print(tabulate(
+            rows,
+            headers=['', 'Team'] + [ n+1 for n in range(n_innings) ] + ['', 'R', 'H', 'E'],
+            tablefmt='fancy_grid',
+        ))
 
-            self.innings.append(inning)
+    def play(self):
+        while self._n_inning < N_INNINGS:
+            self.make_next_inning()
+
+            if not self.inning.is_over:
+                # TODO go in to extra innings
+                self.inning.play()
 
 
 if __name__ == '__main__':
@@ -293,8 +420,9 @@ if __name__ == '__main__':
     use_defaults = True
 
     game = Game()
-    game.teams.append(game.get_team_from_roster(roster_filename_a))
-    game.teams.append(game.get_team_from_roster(roster_filename_b))
+    team_away = game.get_team_from_roster(roster_filename_a)
+    team_home = game.get_team_from_roster(roster_filename_b)
+    game.teams = [team_away, team_home]
 
     if roster_filename_a == roster_filename_b:
         game.teams[1].name = "The Dopplegangers"
@@ -314,7 +442,7 @@ if __name__ == '__main__':
                 pass
         print("Bullpen:")
         team.print_bullpen()
-        starting_pitcher = team.starting_pitchers[0]
+        starting_pitcher = random.choice(team.starting_pitchers)
         team.set_pitcher(starting_pitcher)
         print()
         print(f"Starting pitcher: {team.pitcher.name}")
@@ -327,3 +455,4 @@ if __name__ == '__main__':
 
     # play ball!
     game.play()
+    game.print_scoreboard()

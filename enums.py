@@ -46,6 +46,8 @@ Traits = Enum('Traits', [
     'T+',
 ])
 
+InningHalfName = Enum('InningHalfName', ['TOP', 'BOTTOM'])
+
 pos_pitchers = (
     Positions.SP,
     Positions.RP,
