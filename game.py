@@ -223,12 +223,17 @@ class AtBat:
         print(batter)
         # throw the pitch
         # TODO add mods
-        pitch_value = roll(pitcher.pd.name)
+        pitch_value_multiplier = -1 if '-' in pitcher.pd.name else 1
+        pitch_value = roll(pitcher.pd.name) * pitch_value_multiplier
         logging.info("Pitcher %s threw %s.", pitcher.name, pitch_value)
 
         # batter swings
         swing_value = roll('d100')
         logging.info("Batter %s swung %s.", batter.name, swing_value)
+
+        mss = swing_value + pitch_value
+
+        logging.debug("MSS=%s", mss)
 
         # TODO
         #import time
