@@ -8,6 +8,7 @@ import sys
 from tabulate import tabulate
 
 from enums import Handedness, PitcherDice, Positions, Traits, InningHalfName, pos_pitchers
+import tables
 
 
 logging.basicConfig(filename='debug.log', level=logging.DEBUG)
@@ -268,29 +269,34 @@ class AtBat:
         logging.info("Batter %s swung %s.", batter.name, swing_value)
 
         mss = swing_value + pitch_value
-
         logging.debug("MSS=%s", mss)
 
-        # TODO
-        import time
-        time.sleep(1)
-
-        # TODO modify swing value
-
-        # TODO implement swing result tables
+        # TODO modify swing value with traits
+        swing_result = tables.swing_result_table(batter.bt, batter.obt, mss)
+        logging.debug("Swing result: %s", swing_result)
 
         # TODO check rules to see if roll should be <= bt or < bt
-        if swing_value <= batter.bt:
+
+        # TODO simple hit/out check for now
+        if 'hit' in swing_result.lower():
             logging.debug("HIT!")
             print()
             print("HIT!")
             print()
             # TODO every hit is a single for now
-            self.game.single()
-            self.half.hits += 1
+            self.half.inning.game.single()
+        elif 'out' in swing_result.lower():
+            self.half.inning.game.out()
+            print()
+            print(f"OUT #{self.half.outs}!")
+            print()
         else:
-            # TODO check out table
-            self.half.outs += 1
+            # TODO other stuff
+            self.half.inning.game.out()
+
+        # TODO
+        import time
+        time.sleep(1)
 
 
 class InningHalf:
@@ -384,20 +390,27 @@ class Game:
     def home(self):
         return self.teams[1]
 
+    def hit(self, n_bases):
+        self.bases.advance_batter(n_bases)
+        self.inning.half.hits += 1
+
     def single(self):
-        self.bases.advance_batter(1)
+        self.hit(1)
 
     def double(self):
-        self.bases.advance_batter(2)
+        self.hit(2)
 
     def triple(self):
-        self.bases.advance_batter(3)
+        self.hit(3)
 
     def home_run(self):
-        self.bases.advance_batter(4)
+        self.hit(4)
 
     def runner_reached_home(self):
         self.inning.half.runs += 1
+
+    def out(self):
+        self.inning.half.outs += 1
 
     def clean_row(self, n, row):
         return {
