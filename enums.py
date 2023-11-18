@@ -1,7 +1,7 @@
 from enum import Enum
 
 
-Handedness = Enum('Handedness', ['L', 'R', 'S'])
+Hand = Enum('Hand', ['L', 'R', 'S'])
 
 PitcherDice = Enum('PitcherDice', [
     '-d4',

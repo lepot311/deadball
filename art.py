@@ -1,5 +1,7 @@
 from termcolor import colored
 
+from enums import Hand, Positions
+
 
 field = r'''
                   ___________________
@@ -26,14 +28,12 @@ field = r'''
 
 '''
 
-batting = {
+positions = {
     'BBB': (0, 'L'),
     'R1' : (1, 'R'),
     'R2' : (2, 'R'),
     'R3' : (3, 'R'),
-}
 
-fielding = {
     'PPP': (1, 'R'),
     'CCC': (2, 'R'),
     '1B' : (3, 'R'),
@@ -45,14 +45,71 @@ fielding = {
     'RF' : (9, 'R'),
 }
 
-if __name__ == '__main__':
+def color_field(field):
     # color field green
     field = field.replace('\\', colored('\\', 'light_green'))
     field = field.replace('/', colored('/', 'light_green'))
     field = field.replace('_', colored('_', 'light_green'))
-    field = field.replace('.', colored('.', 'light_yellow'))
+    field = field.replace('.', colored('.', 'yellow'))
+    return field
 
-    for pos, info in batting.items():
+def print_field(game, field):
+    field = color_field(field)
+    assert 'PPP' in field
+
+    # DRAW FIELDERS
+    # draw pitcher
+    player = game.inning.half.fielding.pitcher
+    if player.hand == Hand.R:
+        sub = f"{player.number:>3}"
+    else:
+        sub = f"{player.number:<3}"
+    field = field.replace('PPP', colored(sub, game.inning.half.fielding.color))
+
+    # draw fielders
+    for player in game.inning.half.fielding.lineup:
+        #print(player.name, player.pos.name, player.number)
+        if player.pos.name == 'C':
+            pos = 'CCC'
+            if game.inning.half.batting.up_to_bat.hand == Hand.R:
+                sub = f"{player.number:>3}"
+            else:
+                sub = f"{player.number:<3}"
+        else:
+            pos = player.pos.name
+            sub = f"{player.number:>2}"
+        field = field.replace(pos, colored(sub, game.inning.half.fielding.color))
+
+    # DRAW BATTING TEAM
+    # draw batter
+    player = game.inning.half.batting.up_to_bat
+    #print('batter:', player.name, player.number)
+    if player.hand == Hand.R:
+        sub = f"{player.number:<3}"
+    else:
+        sub = f"{player.number:>3}"
+    field = field.replace('BBB', colored(sub, game.inning.half.batting.color))
+
+    # draw runners
+    #print('runners:')
+    for base_number, player in enumerate(game.bases):
+        base_number += 1
+        pos = f"R{base_number}"
+        if player:
+            #print(player.name, player.number)
+            sub = f"{player.number:>2}"
+            field = field.replace(pos, colored(sub, game.inning.half.batting.color))
+        else:
+            sub = f"{'o':>2}"
+            field = field.replace(pos, colored(sub, 'white'))
+
+    print(field)
+
+
+if __name__ == '__main__':
+    field = color_field(field)
+
+    for pos, info in positions.items():
         number, hand = info
         if len(pos) == 2:
             sub = f"{number:>2}"
@@ -62,20 +119,8 @@ if __name__ == '__main__':
                     sub = f"{number:<3}"
                 else:
                     sub = f"{number:>3}"
-            else:
-                if hand == 'R':
-                    sub = f"{number:>3}"
-                else:
-                    sub = f"{number:<3}"
-        field = field.replace(pos, colored(sub, 'light_red'))
-
-    for pos, info in fielding.items():
-        number, hand = info
-        if len(pos) == 2:
-            sub = f"{number:>2}"
-        else:
-            if pos == 'CCC':
-                batter_hand = batting['BBB'][1]
+            elif pos == 'CCC':
+                batter_hand = positions['BBB'][1]
                 if batter_hand == 'R':
                     sub = f"{number:>3}"
                 else:
@@ -85,6 +130,6 @@ if __name__ == '__main__':
                     sub = f"{number:>3}"
                 else:
                     sub = f"{number:<3}"
-        field = field.replace(pos, colored(sub, 'light_blue'))
+        field = field.replace(pos, colored(sub, 'light_red'))
 
     print(field)

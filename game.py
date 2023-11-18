@@ -7,8 +7,10 @@ import random
 import sys
 
 from tabulate import tabulate
+from termcolor import colored
 
-from enums import Handedness, PitcherDice, Positions, Traits, InningHalfName, pos_pitchers
+from art import field, print_field
+from enums import Hand, PitcherDice, Positions, Traits, InningHalfName, pos_pitchers
 import tables
 
 
@@ -257,6 +259,11 @@ class AtBat:
     def play(self):
         batter  = self.half.batting.up_to_bat
         pitcher = self.half.fielding.pitcher
+
+        os.system('clear')
+        self.half.inning.game.print_scoreboard()
+        self.half.inning.game.print_field()
+
         print()
         print("Now batting:")
         print(batter)
@@ -331,9 +338,6 @@ class InningHalf:
         self.at_bats.append(AtBat(self))
 
     def play(self):
-        os.system('clear')
-        self.inning.game.print_scoreboard()
-
         logging.debug(f"Starting half: {self}")
         while self.outs < 3:
             # select next batter
@@ -424,7 +428,7 @@ class Game:
         return {
             'number': n,
             'name'  : row['Name'],
-            'hand'  : Handedness[row['Handedness']],
+            'hand'  : Hand[row['Handedness']],
             'bt'    : int(row['BT']) if row['BT'] else None,
             'obt'   : int(row['OBT']) if row['OBT'] else None,
             'pd'    : PitcherDice[row['PD']] if row['PD'] else PitcherDice['-d4'],
@@ -449,8 +453,8 @@ class Game:
         inning = Inning(self, self._n_inning)
         self.innings.append(inning)
 
-    def draw_field(self):
-        print(art.field().format(self))
+    def print_field(self):
+        print_field(self, field)
 
     def print_scoreboard(self):
         n_innings = max(self._n_inning, N_INNINGS)
@@ -481,8 +485,8 @@ class Game:
             runs_home.append(runs)
 
         rows = [
-            ['Visitors', self.away.name] + runs_away + ['', self.away.runs, self.away.hits, self.away.errors],
-            ['Home',     self.home.name] + runs_home + ['', self.home.runs, self.home.hits, self.home.errors],
+            [colored('Visitors', self.away.color), self.away.name] + runs_away + ['', self.away.runs, self.away.hits, self.away.errors],
+            [colored('Home',     self.home.color), self.home.name] + runs_home + ['', self.home.runs, self.home.hits, self.home.errors],
         ]
 
         print(tabulate(
@@ -511,6 +515,8 @@ if __name__ == '__main__':
     team_home = game.get_team_from_roster(roster_filename_b)
     team_away.game = game
     team_home.game = game
+    team_away.color = 'light_red'
+    team_home.color = 'light_blue'
     game.teams = [team_away, team_home]
 
     if roster_filename_a == roster_filename_b:
