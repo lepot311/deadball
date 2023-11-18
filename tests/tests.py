@@ -62,6 +62,16 @@ def test__game_ready__bases_clear(game_ready):
     game_ready.bases.clear()
     assert game_ready.bases == [None, None, None]
 
+def test__game_ready__bases_clear_after_half(game_ready):
+    g = game_ready
+    # batter singles
+    batter1 = g.inning.half.batting.up_to_bat
+    g.single()
+    assert g.bases == [batter1, None, None]
+    g.inning.make_next_half()
+    assert g.bases == [None, None, None]
+
+
 def test__base_queue__bases_empty__four_singles(game_ready):
     g = game_ready
     # batter singles

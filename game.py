@@ -2,6 +2,7 @@ from collections import UserList
 import csv
 from enum import Enum
 import logging
+import os
 import random
 import sys
 
@@ -56,6 +57,7 @@ class BaseQueue(UserList):
         logging.debug("Runners after cleanup: %s", self.data)
 
     def advance_batter(self, n):
+        logging.debug("Advance batter %s bases", n)
         if n >= 1:
             self.data.insert(0, self.game.inning.half.batting.up_to_bat)
             n_extra_bases = n-1
@@ -268,7 +270,7 @@ class AtBat:
         swing_value = roll('d100')
         logging.info("Batter %s swung %s.", batter.name, swing_value)
 
-        mss = swing_value + pitch_value
+        mss = max(1, swing_value + pitch_value)
         logging.debug("MSS=%s", mss)
 
         # TODO modify swing value with traits
@@ -278,7 +280,7 @@ class AtBat:
         # TODO check rules to see if roll should be <= bt or < bt
 
         # TODO simple hit/out check for now
-        if 'hit' in swing_result.lower():
+        if 'hit' in swing_result.lower() or 'walk' in swing_result.lower():
             logging.debug("HIT!")
             print()
             print("HIT!")
@@ -293,6 +295,9 @@ class AtBat:
         else:
             # TODO other stuff
             self.half.inning.game.out()
+            print()
+            print(f"OUT #{self.half.outs}!")
+            print()
 
         # TODO
         import time
@@ -315,6 +320,8 @@ class InningHalf:
         else:
             self.fielding, self.batting = self.inning.game.teams
 
+        self.inning.game.bases.clear()
+
     @property
     def at_bat(self):
         return self.at_bats[-1]
@@ -324,6 +331,7 @@ class InningHalf:
         self.at_bats.append(AtBat(self))
 
     def play(self):
+        os.system('clear')
         self.inning.game.print_scoreboard()
 
         logging.debug(f"Starting half: {self}")
