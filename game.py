@@ -390,6 +390,9 @@ class Game:
     def double(self):
         self.bases.advance_batter(2)
 
+    def triple(self):
+        self.bases.advance_batter(3)
+
     def runner_reached_home(self):
         self.inning.half.runs += 1
 
