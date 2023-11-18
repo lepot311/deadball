@@ -87,3 +87,18 @@ def test__base_queue__bases_empty__four_singles(game_ready):
     g.single()
     assert g.bases == [batter4, batter3, batter2]
     assert g.inning.half.runs == 1
+
+def test__base_queue__bases_empty__two_doubles(game_ready):
+    g = game_ready
+    # batter doubles
+    batter1 = g.inning.half.batting.up_to_bat
+    g.double()
+    assert g.bases == [None, batter1, None]
+
+    # batter doubles, driving home runner at second
+    g.inning.half.make_next_at_bat()
+    batter2 = g.inning.half.batting.up_to_bat
+    g.double()
+    assert g.bases == [None, batter2, None]
+    assert g.inning.half.runs == 1
+

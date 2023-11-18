@@ -54,8 +54,12 @@ class BaseQueue(UserList):
             self.data = self.data[:3]
         logging.debug("Runners after cleanup: %s", self.data)
 
-    def advance_batter(self):
-        self.data.insert(0, self.game.inning.half.batting.up_to_bat)
+    def advance_batter(self, n):
+        if n >= 1:
+            self.data.insert(0, self.game.inning.half.batting.up_to_bat)
+            n_extra_bases = n-1
+            for n in range(n_extra_bases):
+                self.data.insert(0, None)
         self.check_for_runs()
 
 
@@ -381,7 +385,10 @@ class Game:
         return self.teams[1]
 
     def single(self):
-        self.bases.advance_batter()
+        self.bases.advance_batter(1)
+
+    def double(self):
+        self.bases.advance_batter(2)
 
     def runner_reached_home(self):
         self.inning.half.runs += 1
