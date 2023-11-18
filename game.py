@@ -18,6 +18,7 @@ logging.basicConfig(filename='debug.log', level=logging.DEBUG)
 
 # CONFIGURATION
 N_INNINGS = 9
+SLEEP_SECS = 0
 
 
 def roll(kind: str) -> int:
@@ -307,10 +308,10 @@ class AtBat:
 
         # TODO
         import time
-        time.sleep(1.5)
+        time.sleep(SLEEP_SECS)
 
         self.print()
-        time.sleep(1.5)
+        time.sleep(SLEEP_SECS)
 
 
 class InningHalf:
@@ -518,7 +519,12 @@ class Game:
             if not self.inning.is_over:
                 # TODO go in to extra innings
                 self.inning.play()
+        # extra innings
 
+        # TODO!
+        while self.away.runs == self.home.runs:
+            self.make_next_inning()
+            self.inning.play()
 
 if __name__ == '__main__':
     # clear the debug log
