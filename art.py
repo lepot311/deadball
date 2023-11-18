@@ -11,7 +11,7 @@ field = r'''
    _/                     CF                      \_
  _/                                                 \_
 /                                                     \
-\           LF                           RF           /
+\           LF       XXXXXXXXXXXXX       RF           /
   \                                                 /
     \                     R2                      /
       \              SS  .   .  2B              /
@@ -100,8 +100,16 @@ def print_field(game, field):
             sub = f"{player.number:>2}"
             field = field.replace(pos, colored(sub, game.inning.half.batting.color))
         else:
-            sub = f"{'o':>2}"
+            if base_number == 3:
+                sub = f"{'o':<2}"
+            else:
+                sub = f"{'o':>2}"
             field = field.replace(pos, colored(sub, 'white'))
+
+    # draw result of AB
+    ab_result = game.inning.half.at_bat.result or ''
+    sub = f"{ab_result:^13}"
+    field = field.replace('XXXXXXXXXXXXX', sub)
 
     print(field)
 

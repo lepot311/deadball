@@ -254,19 +254,22 @@ class Team:
 
 class AtBat:
     def __init__(self, half):
-        self.half = half
+        self.half   = half
+
+        self.result = None
+
+    def print(self):
+        os.system('clear')
+        self.half.inning.game.print_scoreboard()
+        self.half.inning.game.print_atbat()
+        self.half.inning.game.print_field()
 
     def play(self):
         batter  = self.half.batting.up_to_bat
         pitcher = self.half.fielding.pitcher
 
-        os.system('clear')
-        self.half.inning.game.print_scoreboard()
-        self.half.inning.game.print_field()
+        self.print()
 
-        print()
-        print("Now batting:")
-        print(batter)
         # throw the pitch
         # TODO add mods
         pitch_value_multiplier = -1 if '-' in pitcher.pd.name else 1
@@ -287,28 +290,27 @@ class AtBat:
         # TODO check rules to see if roll should be <= bt or < bt
 
         # TODO simple hit/out check for now
-        if 'hit' in swing_result.lower() or 'walk' in swing_result.lower():
+        if 'hit' in swing_result.lower():
             logging.debug("HIT!")
-            print()
-            print("HIT!")
-            print()
             # TODO every hit is a single for now
             self.half.inning.game.single()
+            self.result = "SINGLE"
+        elif 'walk' in swing_result.lower():
+            self.result = "WALK"
         elif 'out' in swing_result.lower():
             self.half.inning.game.out()
-            print()
-            print(f"OUT #{self.half.outs}!")
-            print()
+            self.result = f"OUT #{self.half.outs}"
         else:
             # TODO other stuff
             self.half.inning.game.out()
-            print()
-            print(f"OUT #{self.half.outs}!")
-            print()
+            self.result = f"OUT #{self.half.outs}"
 
         # TODO
         import time
-        time.sleep(1)
+        time.sleep(1.5)
+
+        self.print()
+        time.sleep(1.5)
 
 
 class InningHalf:
@@ -453,6 +455,20 @@ class Game:
         inning = Inning(self, self._n_inning)
         self.innings.append(inning)
 
+    def print_atbat(self):
+        headers = ['Batting', 'Outs', 'At Bat']
+        batting_team = self.inning.half.batting
+        rows = [[
+            colored(batting_team.name, batting_team.color),
+            self.inning.half.outs,
+            batting_team.up_to_bat.name,
+        ]]
+        print(tabulate(
+            rows,
+            headers=headers,
+            tablefmt='fancy_grid',
+        ))
+
     def print_field(self):
         print_field(self, field)
 
@@ -505,6 +521,9 @@ class Game:
 
 
 if __name__ == '__main__':
+    # clear the debug log
+    os.system(':>debug.log')
+
     roster_filename_a = sys.argv[1]
     roster_filename_b = sys.argv[2]
 
@@ -524,25 +543,25 @@ if __name__ == '__main__':
 
     for team in game.teams:
         team.set_lineup()
-        print()
-        print(team.name)
-        print()
-        print("Lineup:")
-        team.print_lineup()
-        print()
         if not use_defaults:
+            print()
+            print(team.name)
+            print()
+            print("Lineup:")
+            team.print_lineup()
+            print()
             change_lineup = input("Change lineup? [y/N] ")
             if change_lineup.lower() in ('y', 'yes'):
                 # TODO
                 pass
-        print("Bullpen:")
-        team.print_bullpen()
+            print("Bullpen:")
+            team.print_bullpen()
         starting_pitcher = random.choice(team.starting_pitchers)
         team.set_pitcher(starting_pitcher)
-        print()
-        print(f"Starting pitcher: {team.pitcher.name}")
-        print()
         if not use_defaults:
+            print()
+            print(f"Starting pitcher: {team.pitcher.name}")
+            print()
             change_pitcher = input("Change starting pitcher? [y/N] ")
             if change_pitcher.lower() in ('y', 'yes'):
                 # TODO
@@ -550,4 +569,5 @@ if __name__ == '__main__':
 
     # play ball!
     game.play()
+    print("THAT'S THE GAME!")
     game.print_scoreboard()
