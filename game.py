@@ -449,6 +449,9 @@ class Game:
         inning = Inning(self, self._n_inning)
         self.innings.append(inning)
 
+    def draw_field(self):
+        print(art.field().format(self))
+
     def print_scoreboard(self):
         n_innings = max(self._n_inning, N_INNINGS)
         # TODO clean up: merge these
