@@ -55,3 +55,30 @@ def test_get_team_from_roster():
     team = game.get_team_from_roster('tests/roster__test_team.csv')
     team.set_lineup()
     assert team.lineup[0].name == 'Winnie'
+
+def test_game_ready__bases_empty(game_ready):
+    assert game_ready.bases == [None, None, None]
+
+def test_game_ready__bases_clear(game_ready):
+    game_ready.bases.clear()
+    assert game_ready.bases == [None, None, None]
+
+def test_base_queue__bases_empty__batter_singles(game_ready):
+    g = game_ready
+    # advance batter to first
+    batter = g.inning.half.batting.up_to_bat
+    g.single()
+    assert g.bases == [batter, None, None]
+
+def test_base_queue__runner_on_1__batter_singles(game_ready):
+    g = game_ready
+    # advance batter to first
+    batter1 = g.inning.half.batting.up_to_bat
+    g.single()
+    assert g.bases == [batter1, None, None]
+
+    # advance next batter to first, moving up runner at first to second
+    g.inning.half.make_next_at_bat()
+    batter2 = g.inning.half.batting.up_to_bat
+    g.single()
+    assert g.bases == [batter1, batter2, None]

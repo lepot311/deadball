@@ -1,6 +1,6 @@
+from collections import UserList
 import csv
 from enum import Enum
-from itertools import zip_longest
 import logging
 import random
 import sys
@@ -29,6 +29,53 @@ def roll(kind: str) -> int:
     return result
 
 
+class BaseQueue(UserList):
+    def __init__(self, game):
+        self.game = game
+
+        self.data = [ None ] * 3
+
+    def clear(self):
+        self.data = [ None ] * 3
+
+    def get_player_at_base(self, n):
+        assert 0 < n < 4, "Can only get base 1, 2, or 3."
+        return self.data[n-1]
+
+    def base_is_empty(self, n):
+        return self.get_player_at_base(n) is None
+
+    def advance_to(self, player, n):
+        logging.debug("Advancing %s to %s", player.name, n)
+        if not self.base_is_empty(n):
+            self.advance_runner_at_base(n)
+        assert self.base_is_empty(n)
+        self.data[n-1] = player
+
+    def advance_batter(self):
+        # advance existing runners
+        logging.debug("Advancing batter")
+        self.advance_runner_at_base(1)
+        self.advance_to(self.game.inning.half.batting.up_to_bat, 1)
+
+    def advance_runner_at_base(self, n):
+        logging.debug("Advancing runner at %s", n)
+        if self.base_is_empty(n):
+            logging.debug("..But base %s was empty", n)
+            return
+
+        player = self.get_player_at_base(n)
+        next_base = n+1
+        if next_base > 2:
+            self.game.runner_reached_home()
+            self.data[n] = None
+        if self.base_is_empty(next_base):
+            self.advance_to(player, next_base)
+        else:
+            # push next player
+            self.advance_runner_at_base(next_base)
+
+
 class Player:
     def __init__(self, number, name, pos, hand, bt, obt, traits=None, pd=None):
         self.number = number
@@ -54,13 +101,13 @@ class Player:
 
 
 class Team:
-    def __init__(self, game, name, players=None):
-        self.game     = game
+    def __init__(self, name, players=None):
         self.name     = name
         self._players = set(players) if players else set()
 
+        self.game      = None
         self._retired  = set()
-        self._batter_n = 0
+        self._batter_n = -1
         self.lineup    = []
         self.bullpen   = { p for p in self.players if p.pos in pos_pitchers }
         self.pitcher   = None
@@ -112,6 +159,7 @@ class Team:
 
     def add_player(self, player: Player):
         self.players.add(player)
+        logging.debug("Added player %s to team %s", player.name, self)
         if player.pd:
             self.bullpen.add(player)
 
@@ -250,10 +298,9 @@ class AtBat:
             print()
             print("HIT!")
             print()
-            # TODO every hit is a solo home run for now
-            #self.half.runners.append(batter)
+            # TODO every hit is a single for now
+            self.game.single()
             self.half.hits += 1
-            self.half.runs += 1
         else:
             # TODO check out table
             self.half.outs += 1
@@ -268,7 +315,6 @@ class InningHalf:
         self.runs    = 0
         self.hits    = 0
         self.errors  = 0
-        self.runners = []  # TODO make this a queue length=4
         self.at_bats = []
 
         if self.name is InningHalfName.TOP:
@@ -280,14 +326,17 @@ class InningHalf:
     def at_bat(self):
         return self.at_bats[-1]
 
+    def make_next_at_bat(self):
+        self.batting._batter_n += 1
+        self.at_bats.append(AtBat(self))
+
     def play(self):
         self.inning.game.print_scoreboard()
 
         logging.debug(f"Starting half: {self}")
         while self.outs < 3:
             # select next batter
-            self.batting._batter_n += 1
-            self.at_bats.append(AtBat(self))
+            self.make_next_at_bat()
             self.at_bat.play()
             logging.debug("Outs: %s", self.outs)
         logging.debug(f"Ending half: {self}")
@@ -311,14 +360,17 @@ class Inning:
     def is_over(self):
         return (len(self.halfs) == 2) and (self.halfs[1].outs == 3)
 
+    def make_next_half(self):
+        if not self.halfs:
+            half = InningHalf(self, InningHalfName.TOP)
+        elif len(self.halfs) == 1:
+            half = InningHalf(self, InningHalfName.BOTTOM)
+
+        self.halfs.append(half)
+
     def play(self):
         while len(self.halfs) < 2:
-            if not self.halfs:
-                half = InningHalf(self, InningHalfName.TOP)
-            elif len(self.halfs) == 1:
-                half = InningHalf(self, InningHalfName.BOTTOM)
-
-            self.halfs.append(half)
+            self.make_next_half()
             print()
             print(self.half)
             print()
@@ -331,6 +383,7 @@ class Game:
         self.innings = []
 
         self._n_inning = 0
+        self.bases = BaseQueue(self)
 
     @property
     def inning(self):
@@ -343,6 +396,12 @@ class Game:
     @property
     def home(self):
         return self.teams[1]
+
+    def single(self):
+        self.bases.advance_batter()
+
+    def runner_reached_home(self):
+        self.inning.half.runs += 1
 
     def clean_row(self, n, row):
         return {
@@ -366,7 +425,7 @@ class Game:
         players = [ Player(**row) for row in roster ]
         team_name = filename.split('roster__')[-1].split('.')[0].replace('_', ' ').title()
         logging.debug("Loaded team '%s' from roster file: %s", team_name, filename)
-        return Team(self, team_name, players=players)
+        return Team(team_name, players=players)
 
     def make_next_inning(self):
         self._n_inning += 1
@@ -430,6 +489,8 @@ if __name__ == '__main__':
     game = Game()
     team_away = game.get_team_from_roster(roster_filename_a)
     team_home = game.get_team_from_roster(roster_filename_b)
+    team_away.game = game
+    team_home.game = game
     game.teams = [team_away, team_home]
 
     if roster_filename_a == roster_filename_b:
