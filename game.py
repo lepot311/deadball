@@ -45,35 +45,18 @@ class BaseQueue(UserList):
     def base_is_empty(self, n):
         return self.get_player_at_base(n) is None
 
-    def advance_to(self, player, n):
-        logging.debug("Advancing %s to %s", player.name, n)
-        if not self.base_is_empty(n):
-            self.advance_runner_at_base(n)
-        assert self.base_is_empty(n)
-        self.data[n-1] = player
+    def check_for_runs(self):
+        logging.debug("Runners: %s", self.data)
+        if len(self.data) > 3:
+            for p in self.data[3:]:
+                if p:
+                    self.game.runner_reached_home()
+            self.data = self.data[:3]
+        logging.debug("Runners after cleanup: %s", self.data)
 
     def advance_batter(self):
-        # advance existing runners
-        logging.debug("Advancing batter")
-        self.advance_runner_at_base(1)
-        self.advance_to(self.game.inning.half.batting.up_to_bat, 1)
-
-    def advance_runner_at_base(self, n):
-        logging.debug("Advancing runner at %s", n)
-        if self.base_is_empty(n):
-            logging.debug("..But base %s was empty", n)
-            return
-
-        player = self.get_player_at_base(n)
-        next_base = n+1
-        if next_base > 2:
-            self.game.runner_reached_home()
-            self.data[n] = None
-        if self.base_is_empty(next_base):
-            self.advance_to(player, next_base)
-        else:
-            # push next player
-            self.advance_runner_at_base(next_base)
+        self.data.insert(0, self.game.inning.half.batting.up_to_bat)
+        self.check_for_runs()
 
 
 class Player:
