@@ -116,3 +116,22 @@ def test__base_queue__bases_empty__two_triples(game_ready):
     assert g.bases == [None, None, batter2]
     assert g.inning.half.runs == 1
 
+def test__base_queue__bases_empty__home_run(game_ready):
+    g = game_ready
+    # batter homers
+    batter1 = g.inning.half.batting.up_to_bat
+    g.home_run()
+    assert g.bases == [None, None, None]
+    assert g.inning.half.runs == 1
+
+def test__base_queue__bases_loaded__home_run(game_ready):
+    g = game_ready
+    # first three batters single
+    for n in range(3):
+        g.inning.half.make_next_at_bat()
+        g.single()
+    # fourth batter hits a dinger
+    g.inning.half.make_next_at_bat()
+    g.home_run()
+    assert g.bases == [None, None, None]
+    assert g.inning.half.runs == 4

@@ -55,6 +55,5 @@ def game_ready():
     g.teams = away, home
     g.make_next_inning()
     g.inning.make_next_half()
-    g.inning.half.make_next_at_bat()
     return g
 
